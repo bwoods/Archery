@@ -1,66 +1,74 @@
-use crate::error::Error;
+use crate::entry::occupied::{empty_batch, get_only};
+use crate::error::{Error, Result};
 use arrow_array::RecordBatch;
-use arrow_select::coalesce::BatchCoalescer;
-use fallible_iterator::{FallibleIterator, from_fn};
-use jammdb::Bucket;
+use arrow_select::concat::concat_batches;
+use fallible_iterator::FallibleIterator;
+use jammdb::{Bucket, Cursor, Data, Error::IncompatibleValue, KVPair};
 use loom::Predicate;
-use serde::Deserialize;
-use serde::de::DeserializeOwned;
-use serde_arrow::Deserializer;
 
-pub mod flatten;
-pub mod generator;
+pub mod map_into;
 
-pub(crate) fn iter<'a, T: DeserializeOwned>(
-    parent: &Bucket<'a, 'a>,
-    key: impl AsRef<[u8]>,
-    predicate: &Predicate,
-    projection: &[String],
-) -> impl FallibleIterator<Item = T, Error = Error> {
-    generator::flat_map(parent, key, predicate, projection, |batch| {
-        let deserializer = Deserializer::from_record_batch(&batch)?;
-        Ok(Vec::<T>::deserialize(deserializer)?)
-    })
+pub struct Iterator<'a> {
+    pub(crate) bucket: Bucket<'a, 'a>,
+    pub(crate) predicate: Predicate,
+    pub(crate) projection: Vec<String>,
+
+    pub(crate) outer: Cursor<'a, 'a>,
+    pub(crate) inner: Option<Cursor<'a, 'a>>,
 }
 
-/// See [`BatchCoalescer::with_biggest_coalesce_batch_size`] for discussion of
-/// how the `limit` parameter may be used.
-pub(crate) fn chunk<'a, T: DeserializeOwned>(
-    parent: &Bucket<'a, 'a>,
-    key: impl AsRef<[u8]>,
-    predicate: &Predicate,
-    projection: &[String],
-    size: usize,
-    limit: Option<usize>,
-) -> impl FallibleIterator<Item = RecordBatch, Error = Error> {
-    let mut iter = generator::flatten(parent, key, predicate, projection);
-    let mut coalescer: Option<BatchCoalescer> = None;
+impl<'a> FallibleIterator for Iterator<'a> {
+    type Item = RecordBatch;
+    type Error = Error;
 
-    from_fn(move || {
-        loop {
-            match (iter.next()?, coalescer.as_mut()) {
-                (Some(next), Some(buffered)) => {
-                    buffered.push_batch(next)?; // next batch; do we have more than `size`?
-                    if buffered.has_completed_batch() {
-                        return Ok(buffered.next_completed_batch());
-                    }
-                }
-                (Some(first), None) => {
-                    // first batch; use its schema to create the BatchCoalescer
-                    let coalescer = coalescer.insert(
-                        BatchCoalescer::new(first.schema(), size)
-                            .with_biggest_coalesce_batch_size(limit),
-                    );
-                    coalescer.push_batch(first)?;
-                }
-                (None, Some(buffered)) => {
-                    buffered.finish_buffered_batch()?; // last batch; finish up
-                    let last = buffered.next_completed_batch();
-                    coalescer = None; // ⬇︎ will be hit on any subsequent calls
-                    return Ok(last);
-                }
-                (None, None) => return Ok(None),
-            }
+    fn next(&mut self) -> Result<Option<Self::Item>> {
+        if let Some(kv) = self.next_kv()? {
+            Ok(Some(get_only(
+                kv.value(),
+                &self.predicate,
+                &self.projection,
+            )?))
+        } else {
+            Ok(None)
         }
-    })
+    }
+}
+
+impl<'a> Iterator<'a> {
+    /// - See [`itertools::Itertools::concat`] for comparison.
+    /// - See [`arrow_select::concat::concat_batches`] for related warnings
+    /// about memory usage and offset overflows.
+    pub fn concat(self) -> Result<RecordBatch> {
+        let batches: Vec<_> = self.collect()?;
+        match batches.first().map(|first| first.schema()) {
+            Some(schema) => Ok(concat_batches(&schema, &batches)?),
+            None => Ok(empty_batch()),
+        }
+    }
+
+    pub(crate) fn next_kv(&mut self) -> Result<Option<KVPair<'a, 'a>>> {
+        match self.inner {
+            Some(ref mut inner) => match inner.next() {
+                Some(data) => match data {
+                    Data::KeyValue(kv) => Ok(Some(kv)),
+                    Data::Bucket(_) => Err(IncompatibleValue.into()),
+                },
+                None => {
+                    self.inner = None;
+                    self.next_kv() // recurse; grab the next outer
+                }
+            },
+            None => match self.outer.next() {
+                Some(data) => match data {
+                    Data::KeyValue(kv) => Ok(Some(kv)),
+                    Data::Bucket(name) => {
+                        let bucket = self.bucket.get_bucket(name)?;
+                        self.inner = Some(bucket.cursor());
+                        self.next_kv() // recurse; grab the next inner
+                    }
+                },
+                None => Ok(None),
+            },
+        }
+    }
 }

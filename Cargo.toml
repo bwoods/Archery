@@ -1,23 +1,25 @@
 [package]
-name = "turtles"
+name = "arrows"
 version = "0.1.0"
 edition = "2024"
 
 [dependencies]
 tempfile = "3.27.0"
-jammdb = { version = "0.11.0", git = "https://github.com/tokahuke/jammdb.git" }
+jammdb = "0.11.0"
 flux-loom = { path = "flux/crates/loom" } # has updated arrow deps
 
 arrow-array = "59.1.0"
 arrow-schema = "59.1.0"
+arrow-select = "59.1.0"
 arrow-csv = "59.1.0"
 serde_arrow = { version = "0.14.2", features = ["arrow-59"] }
 serde = "1.0.229"
 
 fallible-iterator = "0.3.0"
 itertools = "0.15.0"
+lz4_flex = "0.14.0"
 
-truecalc-core = "4.0.0"
-truecalc-workbook = "4.0.0"
+truecalc-core = "6.0.1"
+truecalc-workbook = "6.0.1"
 pulldown-cmark = "0.13.4"
 
