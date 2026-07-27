@@ -59,7 +59,7 @@ impl<'tx, K: ToBytes<'tx> + Clone> Entry<'tx, K> {
         match self {
             Self::Occupied(occupied) => Ok(occupied),
             Self::Vacant(vacant) => {
-                let value = default(&vacant.key);
+                let value = default(&vacant.slot.key);
                 vacant.insert_entry(value)
             }
         }

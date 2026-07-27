@@ -15,16 +15,19 @@ where
         I: IntoIterator<Item = RecordBatch>,
     {
         match self {
-            Entry::Vacant(vacant) => vacant.extend(iter.into_iter()),
+            Entry::Vacant(vacant) => vacant.slot.extend(iter.into_iter()),
             Entry::Occupied(occupied) => match occupied.data()? {
                 Data::Bucket(name) => {
-                    let bucket = occupied.parent.get_bucket(name)?;
-                    occupied.append(&bucket, iter)
+                    let bucket = occupied.slot.parent.get_bucket(name)?;
+                    occupied.slot.append(&bucket, iter)
                 }
                 Data::KeyValue(kv) => {
                     let current = occupied.slot.get(kv)?;
-                    occupied.parent.delete(occupied.name())?;
-                    occupied.extend(once(current).chain(iter.into_iter()))
+                    occupied
+                        .slot
+                        .parent
+                        .delete(occupied.slot.key.clone().to_bytes())?;
+                    occupied.slot.extend(once(current).chain(iter.into_iter()))
                 }
             },
         }

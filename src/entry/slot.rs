@@ -13,9 +13,7 @@ use loom::decompressors::FluxReader;
 use loom::{LoomCompressor, LoomDecompressor, Predicate};
 use std::iter::once;
 
-/// Commonality between `Vacant` and `Occupied` entries.
-#[doc(hidden)]
-pub struct Slot<'a, K> {
+pub(crate) struct Slot<'a, K> {
     pub(crate) compression: Compression,
     pub(crate) projection: Vec<String>,
     pub(crate) predicate: Predicate,
@@ -24,10 +22,6 @@ pub struct Slot<'a, K> {
 }
 
 impl<'a, K> Slot<'a, K> {
-    pub fn key(&self) -> &K {
-        &self.key
-    }
-
     pub(crate) fn extend<I>(&self, iter: I) -> Result<()>
     where
         K: ToBytes<'a> + Clone,

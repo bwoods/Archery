@@ -7,56 +7,52 @@ pub struct Occupied<'a, K> {
     pub(crate) slot: Slot<'a, K>,
 }
 
-#[doc(hidden)]
-impl<'a, K> std::ops::Deref for Occupied<'a, K> {
-    type Target = Slot<'a, K>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.slot
-    }
-}
-
 /// See [`std::collections::btree_map::OccupiedEntry`] for comparison.
-impl<'a, K> Occupied<'a, K>
-where
-    K: ToBytes<'a> + Clone,
-{
+impl<'a, K> Occupied<'a, K> {
     pub fn key(&self) -> &K {
-        &self.key
+        &self.slot.key
     }
 
-    pub fn insert_entry(self, value: RecordBatch) -> Result<Occupied<'a, K>> {
+    pub fn insert_entry(self, value: RecordBatch) -> Result<Occupied<'a, K>>
+    where
+        K: ToBytes<'a> + Clone,
+    {
         self.slot.insert_entry(value)
     }
 
-    pub fn remove(self) -> Result<()> {
-        self.parent.delete(self.key.clone().to_bytes())?;
+    pub fn remove(self) -> Result<()>
+    where
+        K: ToBytes<'a> + Clone,
+    {
+        self.slot.parent.delete(self.slot.key.clone().to_bytes())?;
         Ok(())
     }
 
-    /// See the notes on  [`concat_batches`] for related warnings about
-    /// memory usages and offset overflows.
-    pub fn get(&self) -> Result<RecordBatch> {
+    /// - See [`concat_batches`] for related warnings about memory usage and offset overflows.
+    ///
+    /// [`concat_batches`]: https://docs.rs/arrow-select/latest/arrow_select/concat/fn.concat_batches.html
+    pub fn get(&self) -> Result<RecordBatch>
+    where
+        K: ToBytes<'a> + Clone,
+    {
         match self.data()? {
             Data::KeyValue(kv) => self.slot.get(kv),
             Data::Bucket(name) => {
-                let bucket = self.parent.get_bucket(name)?;
+                let bucket = self.slot.parent.get_bucket(name)?;
                 self.slot.concat(&bucket)
             }
         }
     }
 
-    /// A copy of `key` that may be passed into functions expecting an
-    /// `AsRef<[u8]>` (such as [`Bucket::get`]).
-    pub(crate) fn name(&self) -> impl AsRef<[u8]> {
-        self.key.clone().to_bytes()
-    }
-
     /// The [`Bucket`] or [`KVPair`] at this entry.
-    pub(crate) fn data(&self) -> Result<Data<'a, 'a>> {
+    pub(crate) fn data(&self) -> Result<Data<'a, 'a>>
+    where
+        K: ToBytes<'a> + Clone,
+    {
         let data = self
+            .slot
             .parent
-            .get(self.name())
+            .get(self.slot.key.clone().to_bytes())
             .ok_or_else(|| Error::Storage("An `Occupied` entry was empty?".to_string()))?;
 
         Ok(data)

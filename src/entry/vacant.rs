@@ -9,24 +9,15 @@ pub struct Vacant<'a, K> {
     pub(crate) slot: Slot<'a, K>,
 }
 
-#[doc(hidden)]
-impl<'a, K> std::ops::Deref for Vacant<'a, K> {
-    type Target = Slot<'a, K>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.slot
-    }
-}
-
-impl<'a, K> Vacant<'a, K>
-where
-    K: ToBytes<'a> + Clone,
-{
+impl<'a, K> Vacant<'a, K> {
     pub fn key(&self) -> &K {
-        &self.key
+        &self.slot.key
     }
 
-    pub fn insert_entry(self, value: RecordBatch) -> Result<Occupied<'a, K>> {
+    pub fn insert_entry(self, value: RecordBatch) -> Result<Occupied<'a, K>>
+    where
+        K: ToBytes<'a> + Clone,
+    {
         self.slot.insert_entry(value)
     }
 }
