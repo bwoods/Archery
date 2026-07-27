@@ -4,9 +4,12 @@ use jammdb::ToBytes;
 use occupied::Occupied;
 use vacant::Vacant;
 
-pub mod extend;
+mod extend;
 pub mod occupied;
+mod slot;
 pub mod vacant;
+
+pub use slot::Slot;
 
 /// A view into a entry, which may either be vacant or occupied.
 pub enum Entry<'tx, K> {
@@ -54,7 +57,7 @@ impl<'tx, K: ToBytes<'tx> + Clone> Entry<'tx, K> {
             Self::Occupied(occupied) => Ok(occupied),
             Self::Vacant(vacant) => {
                 let value = default(&vacant.key);
-                vacant.insert(value)
+                vacant.insert_entry(value)
             }
         }
     }
@@ -70,9 +73,9 @@ impl<'tx, K: ToBytes<'tx> + Clone> Entry<'tx, K> {
     {
         match self {
             Self::Occupied(occupied) => {
-                let mut value = occupied.get_all()?;
+                let mut value = occupied.get_all()?; // FIXME: occupied.iter()?.concat()?
                 f(&mut value);
-                Ok(Entry::Occupied(occupied.insert(value)?))
+                Ok(Entry::Occupied(occupied.insert_entry(value)?))
             }
             vacant => Ok(vacant),
         }
@@ -82,8 +85,8 @@ impl<'tx, K: ToBytes<'tx> + Clone> Entry<'tx, K> {
     #[inline]
     pub fn insert(self, value: RecordBatch) -> Result<Occupied<'tx, K>> {
         match self {
-            Self::Occupied(occupied) => occupied.insert(value),
-            Self::Vacant(vacant) => vacant.insert(value),
+            Self::Occupied(occupied) => occupied.insert_entry(value),
+            Self::Vacant(vacant) => vacant.insert_entry(value),
         }
     }
 }

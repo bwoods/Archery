@@ -5,10 +5,13 @@ use arrow_select::concat::concat_batches;
 use fallible_iterator::FallibleIterator;
 use jammdb::{Bucket, Cursor, Data, Error::IncompatibleValue, KVPair};
 use loom::Predicate;
+use serde::de::DeserializeOwned;
 
-pub mod map_into;
+mod map_into;
 
-pub struct Iterator<'a> {
+pub use map_into::MapInto;
+
+pub struct Iter<'a> {
     pub(crate) bucket: Bucket<'a, 'a>,
     pub(crate) predicate: Predicate,
     pub(crate) projection: Vec<String>,
@@ -17,7 +20,7 @@ pub struct Iterator<'a> {
     pub(crate) inner: Option<Cursor<'a, 'a>>,
 }
 
-impl<'a> FallibleIterator for Iterator<'a> {
+impl<'a> FallibleIterator for Iter<'a> {
     type Item = RecordBatch;
     type Error = Error;
 
@@ -34,7 +37,7 @@ impl<'a> FallibleIterator for Iterator<'a> {
     }
 }
 
-impl<'a> Iterator<'a> {
+impl<'a> Iter<'a> {
     /// - See [`itertools::Itertools::concat`] for comparison.
     /// - See [`arrow_select::concat::concat_batches`] for related warnings
     /// about memory usage and offset overflows.
@@ -43,6 +46,13 @@ impl<'a> Iterator<'a> {
         match batches.first().map(|first| first.schema()) {
             Some(schema) => Ok(concat_batches(&schema, &batches)?),
             None => Ok(empty_batch()),
+        }
+    }
+
+    pub fn map_into<T: DeserializeOwned>(self) -> MapInto<'a, T> {
+        MapInto {
+            outer: self,
+            inner: Default::default(),
         }
     }
 

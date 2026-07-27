@@ -1,5 +1,4 @@
-use crate::Compression;
-use crate::entry::vacant::insert_entry;
+use crate::entry::slot::Slot;
 use crate::error::{Error, Result};
 use arrow_array::RecordBatch;
 use arrow_schema::Schema;
@@ -9,32 +8,28 @@ use jammdb::{Bucket, Data, ToBytes, ToKVPairs};
 use loom::{LoomDecompressor, Predicate, decompressors::FluxReader};
 
 pub struct Occupied<'a, K> {
-    pub(crate) compression: Compression,
-    pub(crate) parent: Bucket<'a, 'a>,
-    pub(crate) key: K,
+    pub(crate) slot: Slot<'a, K>,
 }
 
+impl<'a, K> std::ops::Deref for Occupied<'a, K> {
+    type Target = Slot<'a, K>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.slot
+    }
+}
+
+/// See [`std::collections::btree_map::OccupiedEntry`] for comparison.
 impl<'a, K> Occupied<'a, K>
 where
     K: ToBytes<'a> + Clone,
 {
-    pub fn with_profile(self, profile: Compression) -> Self {
-        Self {
-            compression: profile,
-            ..self
-        }
-    }
-
-    pub fn key(&self) -> K {
-        self.key.clone()
-    }
-
-    pub fn insert(self, value: RecordBatch) -> Result<Occupied<'a, K>> {
-        insert_entry(self.parent, self.key, self.compression, value)
+    pub fn insert_entry(self, value: RecordBatch) -> Result<Occupied<'a, K>> {
+        self.slot.insert_entry(value)
     }
 
     pub fn remove(self) -> Result<()> {
-        self.parent.delete(self.key.to_bytes())?;
+        self.parent.delete(self.key().to_bytes())?;
         Ok(())
     }
 

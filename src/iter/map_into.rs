@@ -1,6 +1,6 @@
 use crate::entry::occupied::get_only;
 use crate::error::{Error, Result};
-use crate::iter::Iterator;
+use crate::iter::Iter;
 use fallible_iterator::FallibleIterator;
 use loom::atlas::AtlasFooter;
 use serde::Deserialize;
@@ -9,7 +9,7 @@ use serde_arrow::Deserializer;
 use std::collections::VecDeque;
 
 pub struct MapInto<'a, T> {
-    pub(crate) outer: Iterator<'a>,
+    pub(crate) outer: Iter<'a>,
     pub(crate) inner: VecDeque<T>,
 }
 

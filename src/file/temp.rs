@@ -4,7 +4,7 @@ use lz4_flex::frame::FrameDecoder;
 use std::io::{Read, Write};
 use tempfile::NamedTempFile;
 
-struct Temp {
+pub struct Temp {
     _temp: NamedTempFile,
     file: File,
 }
@@ -18,7 +18,7 @@ impl std::ops::Deref for Temp {
 }
 
 impl Temp {
-    pub fn new() -> Result<Self> {
+    pub(crate) fn new() -> Result<Self> {
         // `NamedTempFile` creates an empty file, which jammdb rejects as malformed…
         let mut temp = NamedTempFile::new()?;
         let path = temp.path().to_path_buf();

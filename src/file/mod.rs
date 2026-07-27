@@ -6,6 +6,8 @@ use std::path::Path;
 mod temp;
 pub mod txn;
 
+pub use temp::Temp;
+
 pub struct File {
     db: DB,
 }
@@ -18,6 +20,10 @@ impl File {
             .open(path.as_ref())?;
 
         Ok(Self { db })
+    }
+
+    pub fn temp() -> Result<Temp> {
+        Ok(Temp::new()?)
     }
 
     pub fn txn(&self) -> Result<Txn<'_>> {

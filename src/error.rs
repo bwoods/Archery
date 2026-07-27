@@ -10,9 +10,6 @@ pub enum Error {
     Serialization(String),
     Storage(String),
     Io(std::io::Error),
-
-    OutOfBounds(usize),
-    OccupiedError { key: String },
 }
 
 impl From<ArrowError> for Error {
