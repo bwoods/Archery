@@ -1,7 +1,11 @@
 use crate::entry::slot::Slot;
 use crate::error::{Error, Result};
 use arrow_array::RecordBatch;
-use jammdb::{Data, ToBytes};
+use arrow_schema::Schema;
+use arrow_select::{concat::concat_batches, filter::filter_record_batch};
+use fallible_iterator::{FallibleIterator, IteratorExt};
+use jammdb::{Data, KVPair, ToBytes, ToKVPairs};
+use loom::{LoomDecompressor, Predicate, decompressors::FluxReader};
 
 pub struct Occupied<'a, K> {
     pub(crate) slot: Slot<'a, K>,
@@ -36,10 +40,21 @@ impl<'a, K> Occupied<'a, K> {
         K: ToBytes<'a> + Clone,
     {
         match self.data()? {
-            Data::KeyValue(kv) => self.slot.get(kv),
+            Data::KeyValue(kv) => self.get_kv(kv),
             Data::Bucket(name) => {
                 let bucket = self.slot.parent.get_bucket(name)?;
-                self.slot.concat(&bucket)
+
+                let batches: Vec<_> = bucket
+                    .cursor()
+                    .to_kv_pairs()
+                    .map(|kv| self.get_kv(kv))
+                    .transpose_into_fallible()
+                    .collect()?;
+
+                match batches.first().map(|first| first.schema()) {
+                    Some(schema) => Ok(concat_batches(&schema, &batches)?),
+                    None => Ok(RecordBatch::new_empty(std::sync::Arc::new(Schema::empty()))),
+                }
             }
         }
     }
@@ -56,5 +71,24 @@ impl<'a, K> Occupied<'a, K> {
             .ok_or_else(|| Error::Storage("An `Occupied` entry was empty?".to_string()))?;
 
         Ok(data)
+    }
+
+    pub(crate) fn get_kv(&self, kv: KVPair) -> Result<RecordBatch> {
+        let reader = FluxReader::new("");
+        let batch = if self.slot.projection.is_empty() {
+            reader.decompress(kv.value(), &self.slot.predicate)
+        } else {
+            reader.decompress_projected(kv.value(), &self.slot.predicate, &self.slot.projection)
+        }
+        .and_then(|batch| {
+            if matches!(self.slot.predicate, Predicate::None) {
+                Ok(batch)
+            } else {
+                let mask = self.slot.predicate.eval_on_batch(&batch)?;
+                filter_record_batch(&batch, &mask).map_err(|err| err.into())
+            }
+        })?;
+
+        Ok(batch)
     }
 }

@@ -1,5 +1,4 @@
-use crate::entry::occupied::Occupied;
-use crate::entry::slot::Slot;
+use crate::entry::{occupied::Occupied, slot::Slot};
 use crate::error::Result;
 use arrow_array::RecordBatch;
 use jammdb::ToBytes;

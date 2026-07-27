@@ -2,15 +2,9 @@ use crate::Compression;
 use crate::entry::occupied::Occupied;
 use crate::error::Result;
 use arrow_array::RecordBatch;
-use arrow_schema::Schema;
-use arrow_select::concat::concat_batches;
-use arrow_select::filter::filter_record_batch;
-use fallible_iterator::FallibleIterator;
-use fallible_iterator::IteratorExt;
-use jammdb::{Bucket, KVPair, ToBytes, ToKVPairs};
+use jammdb::{Bucket, ToBytes};
 use loom::compressors::FluxWriter;
-use loom::decompressors::FluxReader;
-use loom::{LoomCompressor, LoomDecompressor, Predicate};
+use loom::{LoomCompressor, Predicate};
 use std::iter::once;
 
 pub(crate) struct Slot<'a, K> {
@@ -69,42 +63,5 @@ impl<'a, K> Slot<'a, K> {
         bucket.put(key.clone(), writer.compress(&value)?)?;
 
         Ok(())
-    }
-
-    pub(crate) fn get(&self, kv: KVPair) -> Result<RecordBatch> {
-        let reader = FluxReader::new("");
-        let batch = if self.projection.is_empty() {
-            reader.decompress(kv.value(), &self.predicate)
-        } else {
-            reader.decompress_projected(kv.value(), &self.predicate, &self.projection)
-        }
-        .and_then(|batch| {
-            if matches!(self.predicate, Predicate::None) {
-                Ok(batch)
-            } else {
-                let mask = self.predicate.eval_on_batch(&batch)?;
-                filter_record_batch(&batch, &mask).map_err(|err| err.into())
-            }
-        })?;
-
-        Ok(batch)
-    }
-
-    pub(crate) fn concat(&self, bucket: &Bucket) -> Result<RecordBatch> {
-        let batches: Vec<_> = bucket
-            .cursor()
-            .to_kv_pairs()
-            .map(|kv| self.get(kv))
-            .transpose_into_fallible()
-            .collect()?;
-
-        match batches.first().map(|first| first.schema()) {
-            Some(schema) => Ok(concat_batches(&schema, &batches)?),
-            None => Ok(self.empty_batch()),
-        }
-    }
-
-    pub(crate) fn empty_batch(&self) -> RecordBatch {
-        RecordBatch::new_empty(std::sync::Arc::new(Schema::empty()))
     }
 }

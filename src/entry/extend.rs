@@ -22,7 +22,7 @@ where
                     occupied.slot.append(&bucket, iter)
                 }
                 Data::KeyValue(kv) => {
-                    let current = occupied.slot.get(kv)?;
+                    let current = occupied.get_kv(kv)?;
                     occupied
                         .slot
                         .parent

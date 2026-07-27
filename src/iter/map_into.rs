@@ -57,7 +57,7 @@ where
             }
         };
 
-        let mut batch = self.outer.slot.get(kv)?;
+        let mut batch = self.outer.occupied.get_kv(kv)?;
         if skipped != n {
             let start = n - skipped;
             let stop = batch.num_rows() - start;

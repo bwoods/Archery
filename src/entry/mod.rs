@@ -4,8 +4,6 @@ use jammdb::ToBytes;
 use occupied::Occupied;
 use vacant::Vacant;
 
-pub(crate) use slot::Slot;
-
 pub use occupied::Occupied as OccupiedEntry;
 pub use vacant::Vacant as VacantEntry;
 
