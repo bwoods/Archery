@@ -1,4 +1,3 @@
-use crate::entry::occupied::get_only;
 use crate::error::{Error, Result};
 use crate::iter::Iter;
 use fallible_iterator::FallibleIterator;
@@ -8,12 +7,12 @@ use serde::de::DeserializeOwned;
 use serde_arrow::Deserializer;
 use std::collections::VecDeque;
 
-pub struct MapInto<'a, T> {
-    pub(crate) outer: Iter<'a>,
+pub struct MapInto<'a, K, T> {
+    pub(crate) outer: Iter<'a, K>,
     pub(crate) inner: VecDeque<T>,
 }
 
-impl<'a, T> FallibleIterator for MapInto<'a, T>
+impl<'a, K, T> FallibleIterator for MapInto<'a, K, T>
 where
     T: DeserializeOwned,
 {
@@ -58,7 +57,7 @@ where
             }
         };
 
-        let mut batch = get_only(kv.value(), &self.outer.predicate, &self.outer.projection)?;
+        let mut batch = self.outer.get(kv)?;
         if skipped != n {
             let start = n - skipped;
             let stop = batch.num_rows() - start;

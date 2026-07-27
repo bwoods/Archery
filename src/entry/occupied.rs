@@ -1,16 +1,13 @@
 use crate::entry::slot::Slot;
 use crate::error::{Error, Result};
 use arrow_array::RecordBatch;
-use arrow_schema::Schema;
-use arrow_select::{concat::concat_batches, filter::filter_record_batch};
-use fallible_iterator::{FallibleIterator, IteratorExt};
-use jammdb::{Bucket, Data, ToBytes, ToKVPairs};
-use loom::{LoomDecompressor, Predicate, decompressors::FluxReader};
+use jammdb::{Data, ToBytes};
 
 pub struct Occupied<'a, K> {
     pub(crate) slot: Slot<'a, K>,
 }
 
+#[doc(hidden)]
 impl<'a, K> std::ops::Deref for Occupied<'a, K> {
     type Target = Slot<'a, K>;
 
@@ -24,27 +21,27 @@ impl<'a, K> Occupied<'a, K>
 where
     K: ToBytes<'a> + Clone,
 {
+    pub fn key(&self) -> &K {
+        &self.key
+    }
+
     pub fn insert_entry(self, value: RecordBatch) -> Result<Occupied<'a, K>> {
         self.slot.insert_entry(value)
     }
 
     pub fn remove(self) -> Result<()> {
-        self.parent.delete(self.key().to_bytes())?;
+        self.parent.delete(self.key.clone().to_bytes())?;
         Ok(())
-    }
-
-    pub fn get_all(&self) -> Result<RecordBatch> {
-        self.get(&Predicate::None, &[])
     }
 
     /// See the notes on  [`concat_batches`] for related warnings about
     /// memory usages and offset overflows.
-    pub fn get(&self, predicate: &Predicate, projection: &[String]) -> Result<RecordBatch> {
+    pub fn get(&self) -> Result<RecordBatch> {
         match self.data()? {
-            Data::KeyValue(kv) => get_only(kv.value(), predicate, projection),
+            Data::KeyValue(kv) => self.slot.get(kv),
             Data::Bucket(name) => {
                 let bucket = self.parent.get_bucket(name)?;
-                concat(&bucket, predicate, projection)
+                self.slot.concat(&bucket)
             }
         }
     }
@@ -52,7 +49,7 @@ where
     /// A copy of `key` that may be passed into functions expecting an
     /// `AsRef<[u8]>` (such as [`Bucket::get`]).
     pub(crate) fn name(&self) -> impl AsRef<[u8]> {
-        self.key().to_bytes()
+        self.key.clone().to_bytes()
     }
 
     /// The [`Bucket`] or [`KVPair`] at this entry.
@@ -64,53 +61,4 @@ where
 
         Ok(data)
     }
-}
-
-pub(crate) fn get(from: &[u8]) -> Result<RecordBatch> {
-    get_only(from, &Predicate::None, &[])
-}
-
-pub(crate) fn get_only(
-    from: &[u8],
-    predicate: &Predicate,
-    projection: &[String],
-) -> Result<RecordBatch> {
-    let reader = FluxReader::new("");
-    let batch = if projection.is_empty() {
-        reader.decompress(from, &predicate)
-    } else {
-        reader.decompress_projected(from, &predicate, projection)
-    }
-    .and_then(|batch| {
-        if matches!(predicate, Predicate::None) {
-            Ok(batch)
-        } else {
-            let mask = predicate.eval_on_batch(&batch)?;
-            filter_record_batch(&batch, &mask).map_err(|err| err.into())
-        }
-    })?;
-
-    Ok(batch)
-}
-
-pub(crate) fn concat<'a>(
-    bucket: &Bucket<'a, 'a>,
-    predicate: &Predicate,
-    projection: &[String],
-) -> Result<RecordBatch> {
-    let batches: Vec<_> = bucket
-        .cursor()
-        .to_kv_pairs()
-        .map(|kv| get_only(kv.value(), predicate, projection))
-        .transpose_into_fallible()
-        .collect()?;
-
-    match batches.first().map(|first| first.schema()) {
-        Some(schema) => Ok(concat_batches(&schema, &batches)?),
-        None => Ok(empty_batch()),
-    }
-}
-
-pub(crate) fn empty_batch() -> RecordBatch {
-    RecordBatch::new_empty(std::sync::Arc::new(Schema::empty()))
 }

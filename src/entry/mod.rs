@@ -4,12 +4,15 @@ use jammdb::ToBytes;
 use occupied::Occupied;
 use vacant::Vacant;
 
-mod extend;
-pub mod occupied;
-mod slot;
-pub mod vacant;
+pub(crate) use slot::Slot;
 
-pub use slot::Slot;
+pub use occupied::Occupied as OccupiedEntry;
+pub use vacant::Vacant as VacantEntry;
+
+mod extend;
+mod occupied;
+mod slot;
+mod vacant;
 
 /// A view into a entry, which may either be vacant or occupied.
 pub enum Entry<'tx, K> {
@@ -20,7 +23,7 @@ pub enum Entry<'tx, K> {
 }
 
 impl<'tx, K: ToBytes<'tx> + Clone> Entry<'tx, K> {
-    pub fn key(&self) -> K {
+    pub fn key(&self) -> &K {
         match self {
             Entry::Occupied(occupied) => occupied.key(),
             Entry::Vacant(vacant) => vacant.key(),
@@ -73,7 +76,7 @@ impl<'tx, K: ToBytes<'tx> + Clone> Entry<'tx, K> {
     {
         match self {
             Self::Occupied(occupied) => {
-                let mut value = occupied.get_all()?; // FIXME: occupied.iter()?.concat()?
+                let mut value = occupied.get()?;
                 f(&mut value);
                 Ok(Entry::Occupied(occupied.insert_entry(value)?))
             }
