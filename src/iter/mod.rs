@@ -1,8 +1,5 @@
 use crate::entry::OccupiedEntry;
-use crate::error::{Error, Result};
-use arrow_array::RecordBatch;
-use fallible_iterator::FallibleIterator;
-use jammdb::{Cursor, Data, Error::IncompatibleValue, KVPair};
+use jammdb::{Cursor, Data, KVPair};
 pub use map_into::MapInto;
 use serde::de::DeserializeOwned;
 
@@ -14,15 +11,32 @@ pub struct Iter<'a, K> {
     pub(crate) occupied: OccupiedEntry<'a, K>,
 }
 
-impl<'a, K> FallibleIterator for Iter<'a, K> {
-    type Item = RecordBatch;
-    type Error = Error;
+impl<'a, K> Iterator for Iter<'a, K> {
+    type Item = KVPair<'a, 'a>;
 
-    fn next(&mut self) -> Result<Option<Self::Item>> {
-        if let Some(kv) = self.next_kv()? {
-            Ok(Some(self.occupied.get_kv(kv)?))
-        } else {
-            Ok(None)
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.inner {
+            Some(ref mut inner) => match inner.next() {
+                Some(data) => match data {
+                    Data::KeyValue(kv) => Some(kv),
+                    Data::Bucket(_) => unreachable!(),
+                },
+                None => {
+                    self.inner = None;
+                    self.next() // recurse; grab the next outer
+                }
+            },
+            None => match self.outer.next() {
+                Some(data) => match data {
+                    Data::KeyValue(kv) => Some(kv),
+                    Data::Bucket(name) => {
+                        let bucket = self.occupied.slot.parent.get_bucket(name).unwrap();
+                        self.inner = Some(bucket.cursor());
+                        self.next() // recurse; grab the next inner
+                    }
+                },
+                None => None,
+            },
         }
     }
 }
@@ -31,33 +45,7 @@ impl<'a, K> Iter<'a, K> {
     pub fn map_into<T: DeserializeOwned>(self) -> MapInto<'a, K, T> {
         MapInto {
             outer: self,
-            inner: Default::default(),
-        }
-    }
-
-    pub(crate) fn next_kv(&mut self) -> Result<Option<KVPair<'a, 'a>>> {
-        match self.inner {
-            Some(ref mut inner) => match inner.next() {
-                Some(data) => match data {
-                    Data::KeyValue(kv) => Ok(Some(kv)),
-                    Data::Bucket(_) => Err(IncompatibleValue.into()),
-                },
-                None => {
-                    self.inner = None;
-                    self.next_kv() // recurse; grab the next outer
-                }
-            },
-            None => match self.outer.next() {
-                Some(data) => match data {
-                    Data::KeyValue(kv) => Ok(Some(kv)),
-                    Data::Bucket(name) => {
-                        let bucket = self.occupied.slot.parent.get_bucket(name)?;
-                        self.inner = Some(bucket.cursor());
-                        self.next_kv() // recurse; grab the next inner
-                    }
-                },
-                None => Ok(None),
-            },
+            queue: Default::default(),
         }
     }
 }

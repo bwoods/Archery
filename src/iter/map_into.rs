@@ -9,7 +9,7 @@ use std::collections::VecDeque;
 
 pub struct MapInto<'a, K, T> {
     pub(crate) outer: Iter<'a, K>,
-    pub(crate) inner: VecDeque<T>,
+    pub(crate) queue: VecDeque<T>,
 }
 
 impl<'a, K, T> FallibleIterator for MapInto<'a, K, T>
@@ -24,21 +24,21 @@ where
     }
 
     fn nth(&mut self, mut n: usize) -> Result<Option<Self::Item>> {
-        if self.inner.is_empty() == false {
-            if n < self.inner.len() {
+        if self.queue.is_empty() == false {
+            if n < self.queue.len() {
                 if n > 0 {
-                    self.inner.drain(..n).for_each(drop);
+                    self.queue.drain(..n).for_each(drop);
                 }
-                return Ok(self.inner.pop_front());
+                return Ok(self.queue.pop_front());
             } else {
-                n -= self.inner.len();
-                self.inner.clear();
+                n -= self.queue.len();
+                self.queue.clear();
             }
         }
 
         let mut skipped: usize = 0;
-        let kv = loop {
-            match self.outer.next_kv()? {
+        let kv = 'found: loop {
+            match self.outer.next() {
                 None => return Ok(None),
                 Some(kv) => {
                     let footer = AtlasFooter::from_file_tail(kv.value())?;
@@ -49,7 +49,7 @@ where
                         .sum();
 
                     if skipped + count > n {
-                        break kv;
+                        break 'found kv;
                     } else {
                         skipped += count;
                     }
@@ -65,9 +65,9 @@ where
         }
 
         let deserializer = Deserializer::from_record_batch(&batch)?;
-        self.inner
+        self.queue
             .append(&mut VecDeque::<T>::deserialize(deserializer)?);
 
-        Ok(self.inner.pop_front())
+        Ok(self.queue.pop_front())
     }
 }

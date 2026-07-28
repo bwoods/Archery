@@ -32,7 +32,7 @@ impl<'a, K> Occupied<'a, K> {
         Ok(())
     }
 
-    /// - See [`concat_batches`] for related warnings about memory usage and offset overflows.
+    /// See [`concat_batches`] for related warnings about memory usage and offset overflows.
     ///
     /// [`concat_batches`]: https://docs.rs/arrow-select/latest/arrow_select/concat/fn.concat_batches.html
     pub fn get(&self) -> Result<RecordBatch>
