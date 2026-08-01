@@ -1,7 +1,9 @@
-pub mod entry;
-pub mod error;
+pub mod arrow;
+mod entry;
 pub mod file;
 pub mod iter;
+pub mod range;
+pub mod transaction;
 
 use loom::CompressionProfile;
 
