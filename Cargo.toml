@@ -15,11 +15,11 @@ arrow-csv = "59.1.0"
 serde_arrow = { version = "0.14.2", features = ["arrow-59"] }
 serde = "1.0.229"
 
-fallible-iterator = "0.3.0"
+#fallible-iterator = "0.3.0"
 itertools = "0.15.0"
 lz4_flex = "0.14.0"
 
-truecalc-core = "6.0.1"
-truecalc-workbook = "6.0.1"
+truecalc-core = "7"
+truecalc-workbook = "7"
 pulldown-cmark = "0.13.4"
 
