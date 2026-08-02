@@ -7,7 +7,7 @@ use serde_arrow::Deserializer;
 use std::collections::{BTreeMap, VecDeque};
 use std::ops::{Bound, RangeBounds};
 
-impl<'a> Entry<'a> {
+impl Entry<'_> {
     #[inline(always)]
     pub fn range<T: DeserializeOwned>(
         &self,
@@ -30,7 +30,7 @@ impl<'a> Entry<'a> {
             queue: Default::default(),
         }
         // using `dropping` here, rather than `skip`, would eagerly fill `queue`
-        // on iterator creation and that feels… un-Rusty?
+        // on iterator creation and that feels… un-Rust-like?
         .skip(range.start)
         .take(range.len()))
     }
@@ -40,7 +40,7 @@ impl<'a> Entry<'a> {
         let mut updates = BTreeMap::default();
 
         let mut range = from_bounds(bounds);
-        let mut start = Range::<()>::advance_inner(&mut iter, range.start)?;
+        let mut start = iter.advance_inner(range.start)?;
 
         loop {
             if range.is_empty() {
@@ -122,15 +122,6 @@ where
     }
 }
 
-impl<T> DoubleEndedIterator for Range<'_, T>
-where
-    T: DeserializeOwned,
-{
-    fn next_back(&mut self) -> Option<Self::Item> {
-        todo!()
-    }
-}
-
 impl<T> Range<'_, T>
 where
     T: DeserializeOwned,
@@ -149,7 +140,7 @@ where
             }
         }
 
-        let k = Self::advance_inner(&mut self.iter, n)?;
+        let k = self.iter.advance_inner(n)?;
         let mut batch = match self.iter.next().transpose()? {
             None => return Ok(k),
             Some(batch) => batch,
@@ -169,18 +160,18 @@ where
 
         Ok(0)
     }
+}
 
-    /// Advances the storage-level iterator until its `next()` will return the
-    /// block that holds row `n` + 1.
+impl Iter<'_> {
+    /// Advances the `Iter` until its `next()` will return the block that holds row `n` + 1.
     ///
-    /// Returns the gap between the number of rows that were requested and the
-    /// number that were actually dropped.
+    /// Returns the gap between `n` and the number of rows that were actually dropped.
     #[inline(never)]
-    fn advance_inner(iter: &mut Iter, n: usize) -> Result<usize, StorageError> {
+    fn advance_inner(&mut self, n: usize) -> Result<usize, StorageError> {
         let mut skipped: usize = 0;
 
         loop {
-            match iter.inner.next() {
+            match self.inner.next() {
                 Some(Ok(found)) => {
                     let footer = AtlasFooter::from_file_tail(found.1.value())
                         .map_err(|err| StorageError::Corrupted(err.to_string()))?;
@@ -192,7 +183,7 @@ where
                         .sum();
 
                     if skipped + count > n {
-                        iter.inner.put_back(Ok(found));
+                        self.inner.put_back(Ok(found));
                         return Ok(0);
                     } else {
                         skipped += count;

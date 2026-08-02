@@ -42,16 +42,16 @@ impl RecordBatch {
     }
 }
 
-impl AsRef<arrow_array::RecordBatch> for RecordBatch {
+impl AsRef<<Self as Deref>::Target> for RecordBatch {
     #[inline]
-    fn as_ref(&self) -> &arrow_array::RecordBatch {
+    fn as_ref(&self) -> &<Self as Deref>::Target {
         self
     }
 }
 
-impl Borrow<arrow_array::RecordBatch> for RecordBatch {
+impl Borrow<<Self as Deref>::Target> for RecordBatch {
     #[inline]
-    fn borrow(&self) -> &arrow_array::RecordBatch {
+    fn borrow(&self) -> &<Self as Deref>::Target {
         self
     }
 }
