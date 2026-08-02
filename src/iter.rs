@@ -1,6 +1,6 @@
 use super::arrow::RecordBatch;
 use super::entry::Entry;
-use fallible_iterator::{Convert, FallibleIterator, IteratorExt};
+use itertools::{PutBack, put_back};
 use loom::Predicate;
 use redb::{Range, ReadableTable, StorageError, Table};
 
@@ -13,16 +13,15 @@ impl<'a> Entry<'a> {
     }
 }
 
-#[derive(Clone)]
 pub struct Iter<'a> {
-    pub(crate) inner: Convert<Range<'a, u32, &'static [u8]>>,
+    pub(crate) inner: PutBack<Range<'a, u32, &'static [u8]>>,
     pub(crate) projection: Vec<String>,
     pub(crate) predicate: Predicate,
 }
 
 impl<'a> Iter<'a> {
     pub(crate) fn new(table: &'a Table<'a, u32, &'static [u8]>) -> Result<Self, StorageError> {
-        let inner = table.iter()?.transpose_into_fallible();
+        let inner = put_back(table.iter()?);
         let projection = Vec::default();
         let predicate = Predicate::None;
 
@@ -49,7 +48,7 @@ impl Iterator for Iter<'_> {
     type Item = Result<RecordBatch, StorageError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self.inner.next().transpose()? {
+        match self.inner.next()? {
             Ok((_, bytes)) => Some(
                 RecordBatch::decompress(&self.projection, &self.predicate, bytes.value())
                     .map_err(|err| StorageError::Corrupted(err.to_string())),
