@@ -77,11 +77,7 @@ impl<'a> OccupiedEntry<'a> {
             .unwrap_or_default()
             + 1;
 
-        let bytes = RecordBatch::compress(Compression::Good, &value)
-            .map_err(|err| StorageError::Corrupted(err.to_string()))?;
-
-        self.table.insert(key, bytes.as_ref())?;
-        Ok(self)
+        self.insert(key, value)
     }
 
     /// `remove` does not actually destroy the table entry; it just empties it.
@@ -94,6 +90,18 @@ impl<'a> OccupiedEntry<'a> {
 
     pub fn key(&self) -> &str {
         self.table.name()
+    }
+
+    pub(crate) fn insert(
+        &mut self,
+        key: u32,
+        value: RecordBatch,
+    ) -> Result<&mut OccupiedEntry<'a>, StorageError> {
+        let bytes = RecordBatch::compress(Compression::Good, &value)
+            .map_err(|err| StorageError::Corrupted(err.to_string()))?;
+
+        self.table.insert(key, bytes.as_ref())?;
+        Ok(self)
     }
 }
 

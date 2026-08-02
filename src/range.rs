@@ -1,11 +1,10 @@
 use super::entry::Entry;
 use super::iter::Iter;
-use fallible_iterator::FallibleIterator;
 use loom::{Predicate, atlas::AtlasFooter};
-use redb::{ReadableTableMetadata, StorageError};
+use redb::StorageError;
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_arrow::Deserializer;
-use std::collections::VecDeque;
+use std::collections::{BTreeMap, VecDeque};
 use std::ops::{Bound, RangeBounds};
 
 impl<'a> Entry<'a> {
@@ -37,31 +36,61 @@ impl<'a> Entry<'a> {
     }
 
     pub fn remove(&mut self, bounds: impl RangeBounds<usize>) -> Result<(), StorageError> {
-        let range = from_bounds(bounds);
-        let mut start = range.start;
-        let mut count = range.len();
-
         let mut iter = self.iter()?;
-        loop {
-            start = Range::<()>::advance_inner(&mut iter, start)?;
+        let mut updates = BTreeMap::default();
 
-            let mut batch = match iter.next() {
-                None => return Ok(()),
-                Some(Err(err)) => return Err(err),
-                Some(Ok(batch)) => batch,
+        let mut range = from_bounds(bounds);
+        let mut start = Range::<()>::advance_inner(&mut iter, range.start)?;
+
+        loop {
+            if range.is_empty() {
+                break;
+            }
+
+            let key = match iter.inner.next().transpose()? {
+                Some(found) => {
+                    let key = found.0.value();
+                    iter.inner.put_back(Ok(found));
+                    key
+                }
+                None => break,
             };
 
-            // batch.0 = match count.cmp(&(batch.num_rows() - start)) {
-            //     Ordering::Less => 0,
-            //     Ordering::Equal => {
-            //         if start == 0 {
-            //             batch.0
-            //         } else {
-            //             batch.slice(start, batch.num_rows() - start)
-            //         }
-            //     }
-            //     Ordering::Greater => 0,
-            // };
+            let mut batch = match iter.next() {
+                Some(Ok(batch)) => batch,
+                Some(Err(err)) => return Err(err),
+                None => break,
+            };
+
+            let length = usize::min(range.len(), batch.num_rows() - start);
+            batch.0 = batch.slice(start, length);
+            start = 0; // after this we always start at the beginning of a block
+
+            if batch.num_rows() == range.len() {
+                updates.insert(key, None); // remove this batch entirely
+            } else {
+                updates.insert(key, Some(batch)); // replace this batch (with a subslice)
+            }
+
+            range.start += length;
+        }
+
+        drop(iter); // now that `iter` is no longer borrowing `self`, we can perform the (delayed) updates
+
+        match self {
+            Entry::Vacant(_) => unreachable!(),
+            Entry::Occupied(entry) => {
+                for (key, replacement) in updates {
+                    match replacement {
+                        Some(batch) => {
+                            entry.insert(key, batch)?;
+                        }
+                        None => {
+                            entry.table.remove(key)?;
+                        }
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -150,7 +179,7 @@ where
     fn advance_inner(iter: &mut Iter, n: usize) -> Result<usize, StorageError> {
         let mut skipped: usize = 0;
 
-        let found = loop {
+        loop {
             match iter.inner.next() {
                 Some(Ok(found)) => {
                     let footer = AtlasFooter::from_file_tail(found.1.value())
@@ -163,7 +192,8 @@ where
                         .sum();
 
                     if skipped + count > n {
-                        break found;
+                        iter.inner.put_back(Ok(found));
+                        return Ok(0);
                     } else {
                         skipped += count;
                         continue;
@@ -172,10 +202,7 @@ where
                 Some(Err(err)) => return Err(err),
                 None => return Ok(n - skipped),
             }
-        };
-
-        iter.inner.put_back(Ok(found));
-        Ok(0)
+        }
     }
 }
 
