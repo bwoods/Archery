@@ -1,5 +1,7 @@
-use crate::transaction::Txn;
-use redb::{Builder, Database, DatabaseError, TransactionError, backends::InMemoryBackend};
+use crate::entry::{Entry, OccupiedEntry, VacantEntry};
+use redb::backends::InMemoryBackend;
+use redb::{Builder, Database, ReadableTableMetadata, TableDefinition, WriteTransaction};
+use redb::{CommitError, DatabaseError, StorageError, TableError, TransactionError};
 use std::path::Path;
 use tempfile::NamedTempFile;
 
@@ -26,5 +28,31 @@ impl File {
     pub fn txn(&self) -> Result<Txn, TransactionError> {
         let txn = self.db.begin_write()?;
         Ok(Txn { txn })
+    }
+}
+
+pub struct Txn {
+    txn: WriteTransaction,
+}
+
+impl Txn {
+    pub fn commit(self) -> Result<(), CommitError> {
+        self.txn.commit()
+    }
+
+    pub fn rollback(self) -> Result<(), StorageError> {
+        self.txn.abort()
+    }
+
+    pub fn entry(&self, name: &str) -> Result<Entry<'_>, TableError> {
+        let definition = TableDefinition::new(name);
+        let table = self.txn.open_table(definition)?;
+
+        let entry = match table.is_empty()? {
+            true => Entry::Vacant(VacantEntry { table }),
+            false => Entry::Occupied(OccupiedEntry { table }),
+        };
+
+        Ok(entry)
     }
 }

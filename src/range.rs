@@ -1,5 +1,5 @@
-use super::entry::Entry;
-use super::iter::Iter;
+use crate::entry::Entry;
+use crate::iter::Iter;
 use loom::{Predicate, atlas::AtlasFooter};
 use redb::StorageError;
 use serde::{Deserialize, de::DeserializeOwned};
@@ -8,7 +8,6 @@ use std::collections::{BTreeMap, VecDeque};
 use std::ops::{Bound, RangeBounds};
 
 impl Entry<'_> {
-    #[inline(always)]
     pub fn range<T: DeserializeOwned>(
         &self,
         bounds: impl RangeBounds<usize>,
@@ -35,6 +34,7 @@ impl Entry<'_> {
         .take(range.len()))
     }
 
+    #[inline(never)]
     pub fn remove(&mut self, bounds: impl RangeBounds<usize>) -> Result<(), StorageError> {
         let mut iter = self.iter()?;
         let mut updates = BTreeMap::default();
@@ -126,6 +126,7 @@ impl<T> Range<'_, T>
 where
     T: DeserializeOwned,
 {
+    #[inline(never)]
     fn advance_by(&mut self, mut n: usize) -> Result<usize, StorageError> {
         if self.queue.is_empty() == false {
             if n < self.queue.len() {

@@ -1,5 +1,5 @@
-use super::Compression;
-use super::arrow::RecordBatch;
+use crate::Compression;
+use crate::arrow::RecordBatch;
 use redb::{ReadableTable, StorageError, TableHandle};
 
 pub(crate) type Table<'a> = redb::Table<'a, u32, &'static [u8]>;

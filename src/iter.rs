@@ -1,5 +1,5 @@
-use super::arrow::RecordBatch;
-use super::entry::Entry;
+use crate::arrow::RecordBatch;
+use crate::entry::Entry;
 use itertools::{PutBack, put_back};
 use loom::Predicate;
 use redb::{Range, ReadableTable, StorageError, Table};

@@ -26,9 +26,9 @@ impl RecordBatch {
     ) -> Result<RecordBatch, FluxError> {
         let reader = FluxReader::new("");
         if projection.is_empty() {
-            reader.decompress(bytes.as_ref(), &predicate)
+            reader.decompress(bytes.as_ref(), predicate)
         } else {
-            reader.decompress_projected(bytes.as_ref(), &predicate, &projection)
+            reader.decompress_projected(bytes.as_ref(), predicate, projection)
         }
         .and_then(|batch| {
             if matches!(predicate, Predicate::None) {
