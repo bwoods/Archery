@@ -87,6 +87,12 @@ impl<'a> Extend<&'a RecordBatch> for RecordBatch {
     }
 }
 
+impl From<<Self as Deref>::Target> for RecordBatch {
+    fn from(value: <Self as Deref>::Target) -> Self {
+        RecordBatch(value)
+    }
+}
+
 #[test]
 fn extend_compiles() {
     let mut a = RecordBatch::default();
