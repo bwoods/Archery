@@ -88,6 +88,7 @@ impl<'a> OccupiedEntry<'a> {
         Ok(VacantEntry { table: self.table })
     }
 
+    /// Gets a reference to the key in the entry.
     pub fn key(&self) -> &str {
         self.table.name()
     }

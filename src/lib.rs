@@ -1,3 +1,4 @@
+pub mod alt;
 pub mod arrow;
 pub mod entry;
 pub mod extend;
