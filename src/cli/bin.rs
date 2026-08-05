@@ -3,7 +3,7 @@ use reedline_repl_rs::{CallBackMap, Repl};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
-use storage::file::File;
+use storage::storage::file::File;
 
 pub mod csv;
 pub mod db;

@@ -1,10 +1,10 @@
-// pub mod alt;
-pub mod arrow;
-pub mod entry;
-pub mod extend;
-pub mod file;
-pub mod iter;
 pub mod range;
+pub mod storage;
+mod structs;
+pub mod traits;
+
+pub use structs::arrow::RecordBatch;
+pub use structs::error::StorageError;
 
 use loom::CompressionProfile;
 

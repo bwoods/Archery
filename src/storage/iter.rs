@@ -1,8 +1,8 @@
-use crate::arrow::RecordBatch;
-use crate::entry::Entry;
+use crate::storage::entry::Entry;
+use crate::{RecordBatch, StorageError};
 use itertools::{PutBack, put_back};
 use loom::Predicate;
-use redb::{Range, ReadableTable, StorageError, Table};
+use redb::{Range, ReadableTable, Table};
 
 impl<'a> Entry<'a> {
     pub fn iter(&'a self) -> Result<Iter<'a>, StorageError> {
@@ -53,7 +53,7 @@ impl Iterator for Iter<'_> {
                 RecordBatch::decompress(&self.projection, &self.predicate, bytes.value())
                     .map_err(|err| StorageError::Corrupted(err.to_string())),
             ),
-            Err(err) => Some(Err(err)),
+            Err(err) => Some(Err(err.into())),
         }
     }
 }

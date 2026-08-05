@@ -1,7 +1,7 @@
-use crate::entry::Entry;
-use crate::iter::Iter;
+use crate::StorageError;
+use crate::storage::entry::Entry;
+use crate::storage::iter::Iter;
 use loom::{Predicate, atlas::AtlasFooter};
-use redb::StorageError;
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_arrow::Deserializer;
 use std::collections::{BTreeMap, VecDeque};
@@ -191,7 +191,7 @@ impl Iter<'_> {
                         continue;
                     }
                 }
-                Some(Err(err)) => return Err(err),
+                Some(Err(err)) => return Err(err.into()),
                 None => return Ok(n - skipped),
             }
         }

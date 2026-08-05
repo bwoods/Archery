@@ -2,7 +2,7 @@ use comfy_table::Table;
 use comfy_table::presets::UTF8_BORDERS_ONLY;
 use reedline_repl_rs::clap::{ArgMatches, FromArgMatches, Subcommand};
 use std::error::Error;
-use storage::file::File;
+use storage::storage::file::File;
 
 #[derive(Debug, Subcommand)]
 pub enum Command {

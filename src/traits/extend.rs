@@ -1,6 +1,5 @@
-use crate::arrow::RecordBatch;
-use crate::entry::{Entry, OccupiedEntry, VacantEntry};
-use redb::StorageError;
+use crate::storage::entry::{Entry, OccupiedEntry, VacantEntry};
+use crate::{RecordBatch, StorageError};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_arrow::schema::{SchemaLike, TracingOptions};
 
