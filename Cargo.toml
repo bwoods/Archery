@@ -9,6 +9,7 @@ tempfile = "3.27.0"
 rayon = "1.12.0"
 redb = "4.1.0"
 jammdb = "0.11.0"
+nut = "0.1.4"
 
 arrow-array = "59.1.0"
 arrow-schema = "59.1.0"

@@ -9,7 +9,6 @@ pub enum Command {
     /// Compact the database
     #[clap(visible_alias = "gc")]
     Compact,
-
     /// Shows
     Stats,
 }
