@@ -6,9 +6,7 @@ use std::collections::VecDeque;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
-use storage::RecordBatch;
-use storage::storage::entry::Entry;
-use storage::storage::file::File;
+use storage::{RecordBatch, storage::Entry, storage::File};
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
@@ -93,7 +91,7 @@ fn import(
         // println!("{} bytes", batch.get_array_memory_size());
 
         n = batch.num_rows();
-        let txn = file.txn()?;
+        let mut txn = file.txn()?;
 
         match txn.entry(&table)? {
             Entry::Occupied(entry) => {

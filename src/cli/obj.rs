@@ -9,8 +9,7 @@ use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
 use storage::RecordBatch;
-use storage::storage::entry::Entry;
-use storage::storage::file::File;
+use storage::storage::{Entry, File};
 use wavefront_obj::obj::{Primitive, VTNIndex, parse};
 
 #[derive(Debug, Subcommand)]
@@ -50,7 +49,7 @@ fn import(
     overwrite: bool,
 ) -> Result<Option<String>, Box<dyn Error>> {
     let parsed = parse(read_to_string(path)?)?;
-    let txn = file.txn()?;
+    let mut txn = file.txn()?;
 
     for obj in parsed.objects {
         println!("{}", obj.name);

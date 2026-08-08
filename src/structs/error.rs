@@ -1,6 +1,8 @@
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum StorageError {
+    /// Failures from various Arrow operations
+    Arrow(arrow_schema::ArrowError),
     /// Error returned when the DB is found to be in an invalid state
     Corrupted(String),
     /// Wrapper around a [`std::io::Error`] that occurred while opening the file or writing to it
@@ -15,6 +17,12 @@ impl std::error::Error for StorageError {}
 impl std::fmt::Display for StorageError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         <Self as std::fmt::Debug>::fmt(self, f)
+    }
+}
+
+impl From<arrow_schema::ArrowError> for StorageError {
+    fn from(error: arrow_schema::ArrowError) -> Self {
+        StorageError::Arrow(error)
     }
 }
 
@@ -101,6 +109,18 @@ impl From<nut::Error> for StorageError {
 
             nut::Error::CheckFail(vec) => StorageError::CheckFail(vec),
             _ => StorageError::Corrupted(error.to_string()),
+        }
+    }
+}
+
+impl From<heed::Error> for StorageError {
+    fn from(error: heed::Error) -> Self {
+        match error {
+            heed::Error::Io(io) => StorageError::Io(io),
+            heed::Error::Mdb(_) | heed::Error::Encoding(_) | heed::Error::Decoding(_) => {
+                StorageError::Corrupted(error.to_string())
+            }
+            heed::Error::EnvAlreadyOpened => StorageError::MisUse(error.to_string()),
         }
     }
 }

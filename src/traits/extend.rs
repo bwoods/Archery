@@ -1,4 +1,4 @@
-use crate::storage::entry::{Entry, OccupiedEntry, VacantEntry};
+use crate::storage::{Entry, OccupiedEntry, VacantEntry};
 use crate::{RecordBatch, StorageError};
 use serde::{Serialize, de::DeserializeOwned};
 use serde_arrow::schema::{SchemaLike, TracingOptions};

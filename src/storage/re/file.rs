@@ -1,6 +1,7 @@
-use crate::StorageError;
-use crate::storage::entry::{Entry, OccupiedEntry, VacantEntry};
-use redb::{Builder, Database, DatabaseStats, backends::InMemoryBackend};
+use super::entry::{Entry, OccupiedEntry, VacantEntry};
+use crate::{RecordBatch, StorageError};
+use arrow_array::record_batch;
+use redb::{Builder, Database, backends::InMemoryBackend};
 use redb::{ReadableTableMetadata, TableDefinition, TableHandle, WriteTransaction};
 use std::path::Path;
 use tempfile::NamedTempFile;
@@ -46,9 +47,22 @@ impl File {
         Ok(self.db.compact()?)
     }
 
-    pub fn stats(&self) -> Result<DatabaseStats, StorageError> {
+    pub fn stats(&self) -> Result<RecordBatch, StorageError> {
         let txn = self.db.begin_write()?;
-        Ok(txn.stats()?)
+        let stats = txn.stats()?;
+
+        let batch = record_batch!(
+            ("tree height", UInt64, [stats.tree_height() as u64]),
+            ("branch pages", UInt64, [stats.branch_pages()]),
+            ("leaf pages", UInt64, [stats.leaf_pages()]),
+            ("metadata bytes", UInt64, [stats.metadata_bytes()]),
+            ("stored bytes", UInt64, [stats.stored_bytes()]),
+            ("fragmented bytes", UInt64, [stats.fragmented_bytes()]),
+            ("allocated pages", UInt64, [stats.allocated_pages()]),
+            ("page size", UInt64, [stats.page_size() as u64])
+        )?;
+
+        Ok(batch.into())
     }
 }
 

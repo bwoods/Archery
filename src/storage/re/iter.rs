@@ -1,4 +1,4 @@
-use crate::storage::entry::Entry;
+use super::entry::Entry;
 use crate::{RecordBatch, StorageError};
 use itertools::{PutBack, put_back};
 use loom::Predicate;

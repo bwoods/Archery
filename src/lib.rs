@@ -1,7 +1,6 @@
-pub mod range;
 pub mod storage;
 mod structs;
-pub mod traits;
+// pub mod traits;
 
 pub use structs::arrow::RecordBatch;
 pub use structs::error::StorageError;

@@ -1,6 +1,5 @@
+use super::{Entry, Iter};
 use crate::StorageError;
-use crate::storage::entry::Entry;
-use crate::storage::iter::Iter;
 use loom::{Predicate, atlas::AtlasFooter};
 use serde::{Deserialize, de::DeserializeOwned};
 use serde_arrow::Deserializer;
