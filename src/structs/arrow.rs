@@ -93,6 +93,12 @@ impl From<<Self as Deref>::Target> for RecordBatch {
     }
 }
 
+impl std::fmt::Display for RecordBatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
 #[test]
 fn extend_compiles() {
     let mut a = RecordBatch::default();

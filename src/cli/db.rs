@@ -1,6 +1,7 @@
-use arrow_array::UInt64Array;
+use arrow_array::StringArray;
 use comfy_table::Table;
 use comfy_table::presets::UTF8_BORDERS_ONLY;
+use itertools::Itertools;
 use reedline_repl_rs::clap::{ArgMatches, FromArgMatches, Subcommand};
 use std::error::Error;
 use storage::storage::File;
@@ -27,22 +28,33 @@ impl Command {
             Command::Stats => {
                 let mut table = Table::new();
 
+                let stats = file.stats()?;
+                let header = stats
+                    .schema_ref()
+                    .fields
+                    .iter()
+                    .map(|field| field.name())
+                    .collect_vec();
+
                 #[rustfmt::skip]
                 table
                     .load_preset(UTF8_BORDERS_ONLY)
-                    .set_header(["storage layout", "value"]);
+                    .set_header(&header);
 
-                let stats = file.stats()?;
-                for (n, field) in stats.schema_ref().fields().iter().enumerate() {
-                    let key = field.name();
-                    let val = stats
-                        .column(n)
-                        .as_any()
-                        .downcast_ref::<UInt64Array>()
-                        .unwrap()
-                        .values()[0];
+                for row in 0..stats.num_rows() {
+                    let mut values = Vec::<&str>::new();
+                    for col in 0..header.len() {
+                        values.push(
+                            stats
+                                .column(col)
+                                .as_any()
+                                .downcast_ref::<StringArray>()
+                                .unwrap()
+                                .value(row),
+                        )
+                    }
 
-                    table.add_row([key, val.to_string().as_str()]);
+                    table.add_row(values);
                 }
 
                 Some(table.to_string())

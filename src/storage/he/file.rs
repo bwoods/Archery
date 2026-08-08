@@ -1,7 +1,8 @@
 use super::entry::{Entry, OccupiedEntry, VacantEntry};
 use crate::{RecordBatch, StorageError};
 use arrow_array::record_batch;
-use heed::{Env, EnvFlags, EnvOpenOptions, RwTxn};
+use heed::types::{Bytes, DecodeIgnore, Str};
+use heed::{Database, Env, EnvFlags, EnvOpenOptions, RwTxn};
 use std::path::{Path, absolute};
 use std::rc::Rc;
 use tempfile::NamedTempFile;
@@ -16,7 +17,7 @@ impl File {
             EnvOpenOptions::new()
                 .map_size(1024 * 1024 * 1024)
                 .max_dbs(512)
-                .flags(EnvFlags::NO_SUB_DIR)
+                .flags(EnvFlags::NO_SUB_DIR | EnvFlags::NO_LOCK)
                 .open(absolute(path.as_ref())?)?
         };
         Ok(Self { env: Rc::new(env) })
@@ -30,7 +31,7 @@ impl File {
     pub fn txn(&self) -> Result<Txn<'_>, StorageError> {
         Ok(Txn {
             txn: self.env.write_txn()?,
-            env: self.env.clone(),
+            env: &self.env,
         })
     }
 
@@ -41,21 +42,48 @@ impl File {
     pub fn stats(&self) -> Result<RecordBatch, StorageError> {
         let stats = self.env.stat();
 
-        let batch = record_batch!(
-            ("tree height", UInt64, [stats.depth as u64]),
-            ("tree entries", UInt64, [stats.entries as u64]),
-            ("branch pages", UInt64, [stats.branch_pages as u64]),
-            ("leaf pages", UInt64, [stats.leaf_pages as u64]),
-            ("overflow pages", UInt64, [stats.overflow_pages as u64]),
-            ("page size", UInt64, [stats.page_size as u64])
-        )?;
+        let mut batch: RecordBatch = record_batch!(
+            ("tree height", Utf8, [stats.depth.to_string()]),
+            ("tree entries", Utf8, [stats.entries.to_string()]),
+            ("branch pages", Utf8, [stats.branch_pages.to_string()]),
+            ("leaf pages", Utf8, [stats.leaf_pages.to_string()]),
+            ("overflow pages", Utf8, [stats.overflow_pages.to_string()]),
+            ("", Utf8, [""])
+        )?
+        .into();
 
-        Ok(batch.into())
+        let txn = self.env.read_txn()?;
+        let all: Database<Str, DecodeIgnore> = self.env.open_database(&txn, None)?.unwrap();
+
+        let mut batches = Vec::new();
+        for db in all.iter(&txn)? {
+            let (name, ()) = db?;
+
+            if let Ok(Some(db)) = self.env.open_database::<Str, Bytes>(&txn, Some(name)) {
+                let stats = db.stat(&txn)?;
+                batches.push(
+                    record_batch!(
+                        ("tree height", Utf8, [stats.depth.to_string()]),
+                        ("tree entries", Utf8, [stats.entries.to_string()]),
+                        ("branch pages", Utf8, [stats.branch_pages.to_string()]),
+                        ("leaf pages", Utf8, [stats.leaf_pages.to_string()]),
+                        ("overflow pages", Utf8, [stats.overflow_pages.to_string()]),
+                        ("", Utf8, [name])
+                    )?
+                    .into(),
+                );
+            }
+        }
+
+        txn.commit()?;
+
+        batch.extend(batches.iter());
+        Ok(batch)
     }
 }
 
 pub struct Txn<'a> {
-    env: Rc<Env>,
+    env: &'a Env,
     txn: RwTxn<'a>,
 }
 
