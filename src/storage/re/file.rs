@@ -50,16 +50,16 @@ impl File {
     pub fn stats(&self) -> Result<RecordBatch, StorageError> {
         let txn = self.db.begin_write()?;
         let stats = txn.stats()?;
+        println!("page size: {}", stats.page_size()); // TODO: log-level
 
         let batch = record_batch!(
-            ("tree height", UInt64, [stats.tree_height() as u64]),
-            ("branch pages", UInt64, [stats.branch_pages()]),
-            ("leaf pages", UInt64, [stats.leaf_pages()]),
+            ("height", UInt32, [stats.tree_height()]),
+            ("branches", UInt64, [stats.branch_pages()]),
+            ("leaves", UInt64, [stats.leaf_pages()]),
+            ("total", UInt64, [stats.allocated_pages()]),
             ("metadata bytes", UInt64, [stats.metadata_bytes()]),
             ("stored bytes", UInt64, [stats.stored_bytes()]),
-            ("fragmented bytes", UInt64, [stats.fragmented_bytes()]),
-            ("allocated pages", UInt64, [stats.allocated_pages()]),
-            ("page size", UInt64, [stats.page_size() as u64])
+            ("fragmented bytes", UInt64, [stats.fragmented_bytes()])
         )?;
 
         Ok(batch.into())
@@ -81,7 +81,8 @@ impl Txn {
         Ok(())
     }
 
-    pub fn entry(&self, name: &str) -> Result<Entry<'_>, StorageError> {
+    // `mut` not needed here, but other implementations do
+    pub fn entry(&mut self, name: &str) -> Result<Entry<'_>, StorageError> {
         let definition = TableDefinition::new(name);
         let table = self.txn.open_table(definition)?;
 

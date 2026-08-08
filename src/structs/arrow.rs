@@ -1,6 +1,8 @@
 use crate::Compression;
+use arrow_cast::display::{ArrayFormatter, FormatOptions};
 use arrow_schema::Schema;
 use arrow_select::{concat::concat_batches, filter::filter_record_batch};
+use comfy_table::{ContentArrangement, Table, presets::UTF8_BORDERS_ONLY};
 use loom::{FluxError, LoomCompressor, LoomDecompressor, Predicate};
 use loom::{compressors::FluxWriter, decompressors::FluxReader};
 use std::borrow::Borrow;
@@ -95,7 +97,35 @@ impl From<<Self as Deref>::Target> for RecordBatch {
 
 impl std::fmt::Display for RecordBatch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        todo!()
+        let header: Vec<_> = self
+            .schema_ref()
+            .fields
+            .iter()
+            .map(|field| field.name())
+            .collect();
+
+        let mut table = Table::new();
+        table
+            .load_style(UTF8_BORDERS_ONLY.with_rounded_corners())
+            .set_content_arrangement(ContentArrangement::Dynamic)
+            .set_header(&header);
+
+        let formatters: Vec<_> = self
+            .columns()
+            .iter()
+            .map(|column| ArrayFormatter::try_new(column, &FormatOptions::default()).unwrap())
+            .collect();
+
+        for row in 0..self.num_rows() {
+            let cells: Vec<_> = formatters
+                .iter()
+                .map(|formatter| formatter.value(row))
+                .collect();
+
+            table.add_row(cells);
+        }
+
+        f.write_str(&table.to_string())
     }
 }
 

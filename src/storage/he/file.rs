@@ -41,13 +41,14 @@ impl File {
 
     pub fn stats(&self) -> Result<RecordBatch, StorageError> {
         let stats = self.env.stat();
+        println!("page size: {}", stats.page_size); // TODO: log-level
 
         let mut batch: RecordBatch = record_batch!(
-            ("tree height", Utf8, [stats.depth.to_string()]),
-            ("tree entries", Utf8, [stats.entries.to_string()]),
-            ("branch pages", Utf8, [stats.branch_pages.to_string()]),
-            ("leaf pages", Utf8, [stats.leaf_pages.to_string()]),
-            ("overflow pages", Utf8, [stats.overflow_pages.to_string()]),
+            ("entries", UInt64, [stats.entries as u64]),
+            ("height", UInt32, [stats.depth]),
+            ("branches", UInt64, [stats.branch_pages as u64]),
+            ("leaves", UInt64, [stats.leaf_pages as u64]),
+            ("overflow", UInt64, [stats.overflow_pages as u64]),
             ("", Utf8, [""])
         )?
         .into();
@@ -63,11 +64,11 @@ impl File {
                 let stats = db.stat(&txn)?;
                 batches.push(
                     record_batch!(
-                        ("tree height", Utf8, [stats.depth.to_string()]),
-                        ("tree entries", Utf8, [stats.entries.to_string()]),
-                        ("branch pages", Utf8, [stats.branch_pages.to_string()]),
-                        ("leaf pages", Utf8, [stats.leaf_pages.to_string()]),
-                        ("overflow pages", Utf8, [stats.overflow_pages.to_string()]),
+                        ("entries", UInt64, [stats.entries as u64]),
+                        ("height", UInt32, [stats.depth]),
+                        ("branches", UInt64, [stats.branch_pages as u64]),
+                        ("leaves", UInt64, [stats.leaf_pages as u64]),
+                        ("overflow", UInt64, [stats.overflow_pages as u64]),
                         ("", Utf8, [name])
                     )?
                     .into(),
@@ -75,7 +76,7 @@ impl File {
             }
         }
 
-        txn.commit()?;
+        txn.commit()?; // keeps LMDB happy in multi-process situations
 
         batch.extend(batches.iter());
         Ok(batch)
