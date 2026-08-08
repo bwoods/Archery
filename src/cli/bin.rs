@@ -29,9 +29,9 @@ pub enum Command {
     /// Enter a command shell
     Shell,
 
-    /// Database maintenance
+    /// File information and maintenance
     #[command(subcommand)]
-    Db(db::Command),
+    File(db::Command),
 
     /// Import/export of tables
     #[command(subcommand)]
@@ -49,10 +49,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     let outro = match cli.command {
         Command::Csv(command) => command.run(&mut file)?,
         Command::Obj(command) => command.run(&mut file)?,
-        Command::Db(command) => command.run(&mut file)?,
+        Command::File(command) => command.run(&mut file)?,
         Command::Shell => {
             let mut callbacks: CallBackMap<File, Box<dyn Error>> = HashMap::new();
-            callbacks.insert("db".to_string(), db::commands);
+            callbacks.insert("file".to_string(), db::commands);
             callbacks.insert("csv".to_string(), csv::commands);
             callbacks.insert("obj".to_string(), obj::commands);
 

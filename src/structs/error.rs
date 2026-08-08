@@ -32,6 +32,12 @@ impl From<std::io::Error> for StorageError {
     }
 }
 
+impl From<tempfile::PersistError> for StorageError {
+    fn from(error: tempfile::PersistError) -> Self {
+        StorageError::Io(error.error)
+    }
+}
+
 impl From<redb::StorageError> for StorageError {
     fn from(error: redb::StorageError) -> Self {
         match error {
