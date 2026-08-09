@@ -3,7 +3,7 @@ use reedline_repl_rs::{CallBackMap, Repl};
 use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
-use storage::storage::File;
+use storage::File;
 
 pub mod csv;
 pub mod db;
@@ -58,7 +58,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let mut repl = Repl::new(file)
                 .with_derived::<CLI>(callbacks)
-                // .with_quick_completions(true)
+                .with_partial_completions(true)
                 .with_history(".history".into(), 500);
             return repl.run().map_err(|err| err.into());
         }

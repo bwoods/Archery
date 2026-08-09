@@ -2,7 +2,7 @@ use crate::Compression;
 use arrow_cast::display::{ArrayFormatter, FormatOptions};
 use arrow_schema::Schema;
 use arrow_select::{concat::concat_batches, filter::filter_record_batch};
-use comfy_table::{ContentArrangement, Table, presets::UTF8_BORDERS_ONLY};
+use comfy_table::{ContentArrangement, LineStyle, Table, TableStyle};
 use loom::{FluxError, LoomCompressor, LoomDecompressor, Predicate};
 use loom::{compressors::FluxWriter, decompressors::FluxReader};
 use std::borrow::Borrow;
@@ -104,9 +104,15 @@ impl std::fmt::Display for RecordBatch {
             .map(|field| field.name())
             .collect();
 
+        let style = TableStyle::new()
+            .top_border(LineStyle::none().fill('─').junction('─'))
+            .header_separator(LineStyle::none().fill('─').junction('─'))
+            .row_separator(LineStyle::none())
+            .bottom_border(LineStyle::none().fill('─').junction('─'));
+
         let mut table = Table::new();
         table
-            .load_style(UTF8_BORDERS_ONLY.with_rounded_corners())
+            .load_style(style)
             .set_content_arrangement(ContentArrangement::Dynamic)
             .set_header(&header);
 

@@ -6,7 +6,7 @@ use std::collections::VecDeque;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
-use storage::{RecordBatch, storage::Entry, storage::File};
+use storage::{Entry, File, RecordBatch};
 
 #[derive(Debug, Subcommand)]
 pub enum Command {

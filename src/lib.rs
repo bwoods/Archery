@@ -1,7 +1,8 @@
-pub mod storage;
+mod storage;
 mod structs;
 // pub mod traits;
 
+pub use storage::{Entry, File};
 pub use structs::arrow::RecordBatch;
 pub use structs::error::StorageError;
 

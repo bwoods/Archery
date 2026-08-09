@@ -42,6 +42,14 @@ impl File {
         })
     }
 
+    pub fn page_size(&self) -> Result<u32, StorageError> {
+        Ok(self.env().stat().page_size)
+    }
+
+    pub fn file_size(&self) -> Result<u64, StorageError> {
+        Ok(self.env().real_disk_size()?)
+    }
+
     pub fn compact(&mut self) -> Result<bool, StorageError> {
         let env = self.env.take().expect("File::env");
         // any failures past this point leave `env` empty
@@ -63,7 +71,6 @@ impl File {
     pub fn stats(&self) -> Result<RecordBatch, StorageError> {
         let stats = self.env().stat();
 
-        println!("page size: {}", stats.page_size); // TODO: log-level
         let mut batch: RecordBatch = record_batch!(
             ("entries", UInt64, [stats.entries as u64]),
             ("height", UInt32, [stats.depth]),

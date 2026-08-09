@@ -9,7 +9,7 @@ use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
 use storage::RecordBatch;
-use storage::storage::{Entry, File};
+use storage::{Entry, File};
 use wavefront_obj::obj::{Primitive, VTNIndex, parse};
 
 #[derive(Debug, Subcommand)]

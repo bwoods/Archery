@@ -154,6 +154,7 @@ impl<'a> VacantEntry<'a> {
             txn: Option::take(&mut self.txn),
             key: std::mem::take(&mut self.key),
         };
+
         occupied.insert_entry(value)?;
         Ok(occupied)
     }

@@ -50,7 +50,6 @@ impl File {
     pub fn stats(&self) -> Result<RecordBatch, StorageError> {
         let txn = self.db.begin_write()?;
         let stats = txn.stats()?;
-        println!("page size: {}", stats.page_size()); // TODO: log-level
 
         let batch = record_batch!(
             ("height", UInt32, [stats.tree_height()]),
