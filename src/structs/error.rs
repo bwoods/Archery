@@ -99,26 +99,6 @@ impl From<redb::TransactionError> for StorageError {
     }
 }
 
-impl From<nut::Error> for StorageError {
-    fn from(error: nut::Error) -> Self {
-        match error {
-            nut::Error::IncompatibleValue
-            | nut::Error::AllocationFailed
-            | nut::Error::BucketNotFound
-            | nut::Error::BucketExists
-            | nut::Error::NameRequired
-            | nut::Error::KeyRequired
-            | nut::Error::KeyTooLarge
-            | nut::Error::ValueTooLarge
-            | nut::Error::ReadInProgress
-            | nut::Error::WriteInProgress => StorageError::MisUse(error.to_string()),
-
-            nut::Error::CheckFail(vec) => StorageError::CheckFail(vec),
-            _ => StorageError::Corrupted(error.to_string()),
-        }
-    }
-}
-
 impl From<heed::Error> for StorageError {
     fn from(error: heed::Error) -> Self {
         match error {

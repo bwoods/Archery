@@ -1,3 +1,4 @@
+use super::file::Txn;
 use crate::structs::arrow::RecordBatch;
 use crate::{Compression, StorageError};
 use heed::RwTxn;
@@ -5,6 +6,27 @@ use heed::byteorder::BigEndian;
 use heed::types::{Bytes, U32};
 
 pub(crate) type Table = heed::Database<U32<BigEndian>, Bytes>;
+
+impl<'a> Txn<'a> {
+    pub fn entry(&mut self, name: &str) -> Result<Entry<'_>, StorageError> {
+        let table = self.env.create_database(&mut self.txn, Some(name))?;
+
+        let entry = match table.len(&mut self.txn)? > 0 {
+            false => Entry::Vacant(VacantEntry {
+                table,
+                txn: Some(self.env.nested_write_txn(&mut self.txn)?),
+                key: name.to_string(),
+            }),
+            true => Entry::Occupied(OccupiedEntry {
+                table,
+                txn: Some(self.env.nested_write_txn(&mut self.txn)?),
+                key: name.to_string(),
+            }),
+        };
+
+        Ok(entry)
+    }
+}
 
 pub enum Entry<'a> {
     Occupied(OccupiedEntry<'a>),

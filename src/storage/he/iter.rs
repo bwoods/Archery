@@ -8,17 +8,17 @@ use loom::Predicate;
 use ouroboros::self_referencing;
 
 impl<'a> Entry<'a> {
-    pub fn into_iter(self) -> Result<Iter<'a>, StorageError> {
+    pub fn iter(&'a self) -> Result<Iter<'a>, StorageError> {
         match self {
-            Entry::Occupied(mut entry) => Iter::from(entry.table, entry.txn.take().unwrap()),
-            Entry::Vacant(mut entry) => Iter::from(entry.table, entry.txn.take().unwrap()),
+            Entry::Occupied(entry) => Iter::from(entry.table, entry.txn.as_ref().unwrap()),
+            Entry::Vacant(entry) => Iter::from(entry.table, entry.txn.as_ref().unwrap()),
         }
     }
 }
 
 #[self_referencing]
 pub struct Iter<'a> {
-    pub(crate) txn: RwTxn<'a>,
+    pub(crate) txn: &'a RwTxn<'a>,
     #[borrows(mut txn)]
     #[not_covariant]
     pub(crate) inner: PutBack<RoIter<'this, U32<BigEndian>, Bytes>>,
@@ -28,7 +28,7 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iter<'a> {
-    pub(crate) fn from(table: Table, txn: RwTxn<'a>) -> Result<Self, StorageError> {
+    pub(crate) fn from(table: Table, txn: &'a RwTxn<'a>) -> Result<Self, StorageError> {
         IterTryBuilder {
             txn,
             inner_builder: |txn| Ok(put_back(table.iter(txn)?)),

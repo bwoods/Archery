@@ -1,15 +1,17 @@
 [package]
 name = "storage"
-version = "0.1.0"
+version = "0.0.0"
 edition = "2024"
 
 [dependencies]
 flux-loom = { path = "flux/crates/loom" } # has updated arrow deps
 tempfile = "3.27.0"
-redb = "4.1.0"
 heed = { version = "0.22.1", default-features = false, features = ["posix-sem"]}
+redb = "4.1.0"
 jammdb = "0.11.0"
-nut = "0.1.4"
+
+truecalc-workbook = "7"
+truecalc-core = "7"
 
 arrow-array = "59.2.0"
 arrow-schema = "59.2.0"
@@ -29,14 +31,12 @@ reedline-repl-rs = { version = "1.3.0", features = ["derive"], optional = true }
 clap = { version = "4.6.5", features = ["derive", "string"], optional = true }
 pulldown-cmark = { version = "0.13.4", optional = true }
 comfy-table = { version = "8", optional = true }
-truecalc-workbook = "7"
-truecalc-core = "7"
 
 wavefront_obj = "11.0.0"
 forsyth = "1.0.1"
 
 
 [[bin]]
-name = "cli"
+name = "storage"
 path = "src/cli/bin.rs"
 required-features = ["reedline-repl-rs", "clap", "comfy-table"]

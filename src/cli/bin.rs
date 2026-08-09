@@ -10,14 +10,9 @@ pub mod db;
 pub mod obj;
 
 #[derive(Parser, Debug)]
-#[command(
-    name = "storage",
-    version,
-    about = "Command line manipulation of storage",
-    next_line_help = true
-)]
+#[command()]
 pub struct CLI {
-    #[arg(required = true)]
+    #[arg(default_value = "db.frames")]
     pub file: PathBuf,
 
     #[command(subcommand)]
@@ -58,8 +53,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             let mut repl = Repl::new(file)
                 .with_derived::<CLI>(callbacks)
-                .with_partial_completions(true)
                 .with_history(".history".into(), 500);
+
             return repl.run().map_err(|err| err.into());
         }
     };
