@@ -54,11 +54,6 @@ impl Command {
             _ => unreachable!(),
         }
     }
-
-    // fn export(self, _file: &mut File) -> Result<Option<String>, Box<dyn Error>> {
-    //     //
-    //     Ok(None)
-    // }
 }
 
 fn import(

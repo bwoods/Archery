@@ -19,8 +19,8 @@ impl<'a> Entry<'a> {
 #[self_referencing]
 pub struct Inner<'a> {
     pub(crate) txn: &'a RwTxn<'a>,
-    #[borrows(mut txn)]
     #[not_covariant]
+    #[borrows(mut txn)]
     pub(crate) iter: PutBack<RoIter<'this, U32<BigEndian>, Bytes>>,
 }
 
