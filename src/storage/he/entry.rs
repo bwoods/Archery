@@ -1,5 +1,6 @@
 use super::file::Txn;
 use crate::structs::arrow::RecordBatch;
+use crate::traits::deref::DerefCell;
 use crate::{Compression, StorageError};
 use heed::RwTxn;
 use heed::byteorder::BigEndian;
@@ -7,20 +8,21 @@ use heed::types::{Bytes, U32};
 
 pub(crate) type Table = heed::Database<U32<BigEndian>, Bytes>;
 
-impl<'a> Txn<'a> {
+impl Txn<'_> {
     pub fn entry(&mut self, name: &str) -> Result<Entry<'_>, StorageError> {
+        let key = name.to_owned();
         let table = self.env.create_database(&mut self.txn, Some(name))?;
 
         let entry = match table.len(&mut self.txn)? > 0 {
             false => Entry::Vacant(VacantEntry {
                 table,
-                txn: Some(self.env.nested_write_txn(&mut self.txn)?),
-                key: name.to_string(),
+                txn: self.env.nested_write_txn(&mut self.txn)?.into(),
+                key,
             }),
             true => Entry::Occupied(OccupiedEntry {
                 table,
-                txn: Some(self.env.nested_write_txn(&mut self.txn)?),
-                key: name.to_string(),
+                txn: self.env.nested_write_txn(&mut self.txn)?.into(),
+                key,
             }),
         };
 
@@ -87,13 +89,13 @@ impl<'a> Entry<'a> {
 
 pub struct OccupiedEntry<'a> {
     pub(crate) table: Table,
-    pub(crate) txn: Option<RwTxn<'a>>,
+    pub(crate) txn: DerefCell<RwTxn<'a>>,
     pub(crate) key: String,
 }
 
 impl Drop for OccupiedEntry<'_> {
     fn drop(&mut self) {
-        if let Some(txn) = self.txn.take() {
+        if let Some(txn) = self.txn.get() {
             txn.commit().expect("OccupiedEntry::drop::commit");
         }
     }
@@ -106,9 +108,7 @@ impl<'a> OccupiedEntry<'a> {
     ) -> Result<&mut OccupiedEntry<'a>, StorageError> {
         let key = self
             .table
-            .last(self.txn.as_ref().ok_or_else(|| {
-                StorageError::MisUse("OccupiedEntry::insert_entry::txn".to_string())
-            })?)?
+            .last(&self.txn)?
             .map(|(k, _)| k)
             .unwrap_or_default()
             + 1;
@@ -120,12 +120,10 @@ impl<'a> OccupiedEntry<'a> {
     ///
     /// `vacuum` will be needed to completely  remove the empty table.
     pub fn remove_entry(mut self) -> Result<VacantEntry<'a>, StorageError> {
-        self.table.clear(self.txn.as_mut().ok_or_else(|| {
-            StorageError::MisUse("OccupiedEntry::remove_entry::txn".to_string())
-        })?)?;
+        self.table.clear(&mut self.txn)?;
         Ok(VacantEntry {
             table: self.table,
-            txn: Option::take(&mut self.txn),
+            txn: self.txn.take().into(),
             key: std::mem::take(&mut self.key),
         })
     }
@@ -143,26 +141,20 @@ impl<'a> OccupiedEntry<'a> {
         let bytes = RecordBatch::compress(Compression::Good, &value)
             .map_err(|err| StorageError::Corrupted(err.to_string()))?;
 
-        self.table.put(
-            self.txn
-                .as_mut()
-                .ok_or_else(|| StorageError::MisUse("OccupiedEntry::insert::txn".to_string()))?,
-            &key,
-            bytes.as_ref(),
-        )?;
+        self.table.put(&mut self.txn, &key, bytes.as_ref())?;
         Ok(self)
     }
 }
 
 pub struct VacantEntry<'a> {
     pub(crate) table: Table,
-    pub(crate) txn: Option<RwTxn<'a>>,
+    pub(crate) txn: DerefCell<RwTxn<'a>>,
     pub(crate) key: String,
 }
 
 impl Drop for VacantEntry<'_> {
     fn drop(&mut self) {
-        if let Some(txn) = self.txn.take() {
+        if let Some(txn) = self.txn.get() {
             txn.commit().expect("VacantEntry::drop::commit");
         }
     }
@@ -171,12 +163,7 @@ impl Drop for VacantEntry<'_> {
 impl<'a> VacantEntry<'a> {
     /// Sets the value of the entry with the `VacantEntry`’s key, and returns an `OccupiedEntry`.
     pub fn insert_entry(mut self, value: RecordBatch) -> Result<OccupiedEntry<'a>, StorageError> {
-        let mut occupied = OccupiedEntry {
-            table: self.table,
-            txn: Option::take(&mut self.txn),
-            key: std::mem::take(&mut self.key),
-        };
-
+        let mut occupied = self.into_occupied();
         occupied.insert_entry(value)?;
         Ok(occupied)
     }
@@ -189,5 +176,13 @@ impl<'a> VacantEntry<'a> {
     /// Gets a reference to the key that would be used when inserting a value through the VacantEntry.
     pub fn key(&self) -> &str {
         &self.key
+    }
+
+    pub(crate) fn into_occupied(mut self) -> OccupiedEntry<'a> {
+        OccupiedEntry {
+            table: self.table,
+            txn: self.txn.take().into(),
+            key: std::mem::take(&mut self.key),
+        }
     }
 }

@@ -22,16 +22,14 @@ pub struct CLI {
 #[derive(Debug, Subcommand)]
 pub enum Command {
     /// Enter a command shell
+    #[clap(alias = "sh")]
     Shell,
-
     /// File information and maintenance
     #[command(subcommand)]
     File(db::Command),
-
     /// Import/export of tables
     #[command(subcommand)]
     Csv(csv::Command),
-
     /// Import/export
     #[command(subcommand)]
     Obj(obj::Command),

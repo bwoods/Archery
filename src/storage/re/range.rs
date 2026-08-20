@@ -165,7 +165,7 @@ where
 impl Iter<'_> {
     /// Advances the `Iter` until its `next()` will return the block that holds row `n` + 1.
     ///
-    /// Returns the gap between `n` and the number of rows that were actually dropped.
+    /// Returns the gap between `n` and the number of rows that were actually skipped.
     #[inline(never)]
     fn advance_inner(&mut self, n: usize) -> Result<usize, StorageError> {
         let mut skipped: usize = 0;

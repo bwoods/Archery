@@ -10,8 +10,8 @@ use ouroboros::self_referencing;
 impl<'a> Entry<'a> {
     pub fn iter(&'a self) -> Result<Iter<'a>, StorageError> {
         match self {
-            Entry::Occupied(entry) => Iter::new(entry.table, entry.txn.as_ref().unwrap()),
-            Entry::Vacant(entry) => Iter::new(entry.table, entry.txn.as_ref().unwrap()),
+            Entry::Occupied(entry) => Iter::new(entry.table, &entry.txn),
+            Entry::Vacant(entry) => Iter::new(entry.table, &entry.txn),
         }
     }
 }

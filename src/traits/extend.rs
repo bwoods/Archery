@@ -7,27 +7,33 @@ impl<T: Serialize + DeserializeOwned> Extend<T> for OccupiedEntry<'_> {
     /// # Panics
     /// Panics on any errors, as the `Extend` trait does not return a `Result`.
     ///
-    /// See [`OccupiedEntry::append`] for the panic-free version
-    fn extend<I: IntoIterator<Item = T>>(&mut self, iter: I) {
-        self.append(iter).unwrap();
+    /// See [`OccupiedEntry::try_extend`] for the panic-free version
+    fn extend<I>(&mut self, iter: I)
+    where
+        I: IntoIterator<Item = T>,
+    {
+        self.try_extend(iter).unwrap();
     }
 }
 
-impl Entry<'_> {
-    pub fn append<T, I>(self, iter: I) -> Result<(), StorageError>
+impl<'a> Entry<'a> {
+    pub fn try_extend<T, I>(self, iter: I) -> Result<OccupiedEntry<'a>, StorageError>
     where
         I: IntoIterator<Item = T>,
         T: Serialize + DeserializeOwned,
     {
         match self {
-            Entry::Occupied(mut entry) => entry.append(iter),
-            Entry::Vacant(entry) => entry.append(iter),
+            Entry::Occupied(mut entry) => {
+                entry.try_extend(iter)?;
+                Ok(entry)
+            }
+            Entry::Vacant(entry) => entry.try_extend(iter),
         }
     }
 }
 
 impl OccupiedEntry<'_> {
-    pub fn append<T, I>(&mut self, iter: I) -> Result<(), StorageError>
+    pub fn try_extend<T, I>(&mut self, iter: I) -> Result<(), StorageError>
     where
         I: IntoIterator<Item = T>,
         T: Serialize + DeserializeOwned,
@@ -47,13 +53,14 @@ impl OccupiedEntry<'_> {
     }
 }
 
-impl VacantEntry<'_> {
-    pub fn append<T, I>(self, iter: I) -> Result<(), StorageError>
+impl<'a> VacantEntry<'a> {
+    pub fn try_extend<T, I>(self, iter: I) -> Result<OccupiedEntry<'a>, StorageError>
     where
         I: IntoIterator<Item = T>,
         T: Serialize + DeserializeOwned,
     {
-        let mut occupied = OccupiedEntry { table: self.table };
-        occupied.append(iter)
+        let mut occupied = self.into_occupied();
+        occupied.try_extend(iter)?;
+        Ok(occupied)
     }
 }

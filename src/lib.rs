@@ -1,6 +1,6 @@
 mod storage;
 mod structs;
-// pub mod traits;
+pub mod traits;
 
 pub use storage::{Entry, File, Iter};
 pub use structs::arrow::RecordBatch;

@@ -1,3 +1,4 @@
+use crate::traits::deref::DerefCell;
 use crate::{RecordBatch, StorageError};
 use arrow_array::record_batch;
 use heed::types::{Bytes, DecodeIgnore, Str};
@@ -6,7 +7,7 @@ use std::path::{Path, absolute};
 use tempfile::NamedTempFile;
 
 pub struct File {
-    env: Option<Env>,
+    env: DerefCell<Env>,
 }
 
 impl File {
@@ -29,7 +30,7 @@ impl File {
     }
 
     fn env(&self) -> &Env {
-        self.env.as_ref().unwrap() // only removed during compaction
+        &self.env
     }
 
     pub fn txn(&self) -> Result<Txn<'_>, StorageError> {
@@ -55,7 +56,7 @@ impl File {
 
     pub fn compact(&mut self) -> Result<bool, StorageError> {
         let before = self.file_size()?;
-        let env = self.env.take().expect("File::env");
+        let env = self.env.take();
         // any failures past this point leave `env` empty
 
         let path = env.path().to_path_buf();
@@ -64,10 +65,7 @@ impl File {
 
         drop(env);
         temp.persist(&path)?;
-        let file = Self::path(path)?;
-
-        let File { env } = file;
-        self.env = env;
+        self.env = Self::path(path)?.env;
 
         let after = self.file_size()?;
         Ok(after != before)
@@ -122,7 +120,7 @@ pub struct Txn<'a> {
     pub(crate) txn: RwTxn<'a>,
 }
 
-impl<'a> Txn<'a> {
+impl Txn<'_> {
     pub fn commit(self) -> Result<(), StorageError> {
         self.txn.commit()?;
         self.env.force_sync()?;
