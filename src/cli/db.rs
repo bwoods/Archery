@@ -54,7 +54,7 @@ pub enum Units {
     PB,
 }
 
-pub fn commands(args: ArgMatches, file: &mut File) -> Result<Option<String>, Box<dyn Error>> {
+pub fn verbs(args: ArgMatches, file: &mut File) -> Result<Option<String>, Box<dyn Error>> {
     Ok(Command::from_arg_matches(&args)?.run(file)?)
 }
 
